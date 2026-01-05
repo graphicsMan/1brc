@@ -609,6 +609,30 @@ struct Maps {
             measurementsSm[st8].merge(agg);
         }
     }
+
+    void consolidate() {
+        // Merge small map into large map
+        for (const auto& [st8, agg] : measurementsSm) {
+            std::string_view station(reinterpret_cast<const char*>(&st8));
+            // Find the actual length (stop at null terminator)
+            size_t len = 0;
+            while (len < 8 && station[len] != '\0') ++len;
+            station = std::string_view(reinterpret_cast<const char*>(&st8), len);
+            measurementsLg[station].merge(agg);
+        }
+        // Don't clear - string_views in measurementsLg point to keys in measurementsSm
+
+        // Merge medium map into large map
+        for (const auto& [st16, agg] : measurementsMd) {
+            std::string_view station(reinterpret_cast<const char*>(&st16));
+            // Find the actual length (stop at null terminator)
+            size_t len = 0;
+            while (len < 16 && station[len] != '\0') ++len;
+            station = std::string_view(reinterpret_cast<const char*>(&st16), len);
+            measurementsLg[station].merge(agg);
+        }
+        // Don't clear - string_views in measurementsLg point to keys in measurementsMd
+    }
 };
 
 void processChunk(char* roughStart, char* roughEnd, char* fileStart, char* fileEnd, Maps& maps) {
@@ -681,6 +705,9 @@ void processChunk(char* roughStart, char* roughEnd, char* fileStart, char* fileE
         maps.add(station, value);
         p = lineEnd + 1;
     }
+
+    // Consolidate small/medium maps into large map
+    maps.consolidate();
 }
 
 int main() {
@@ -734,30 +761,12 @@ int main() {
         threadMaps[0].merge(threadMaps[i]);
     }
 
-    std::cout << "small: " << threadMaps[0].measurementsSm.size() << std::endl;
-    std::cout << "medium: " << threadMaps[0].measurementsMd.size() << std::endl;
-    std::cout << "large: " << threadMaps[0].measurementsLg.size() << std::endl;
+    std::cout << "Total stations: " << threadMaps[0].measurementsLg.size() << std::endl;
 
-    // Output results
+    // Output results (everything is in the large map now)
     std::cout << "{";
     bool first = true;
     for (const auto& [station, agg] : threadMaps[0].measurementsLg) {
-        if (!first) std::cout << ", ";
-        first = false;
-        double mean = (agg.sum / 10.0) / agg.count;
-        ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
-        std::cout << station << "=" << result.toString();
-    }
-    for (const auto& [st8, agg] : threadMaps[0].measurementsSm) {
-        std::string_view station(reinterpret_cast<const char *>(&st8));
-        if (!first) std::cout << ", ";
-        first = false;
-        double mean = (agg.sum / 10.0) / agg.count;
-        ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
-        std::cout << station << "=" << result.toString();
-    }
-    for (const auto& [st16, agg] : threadMaps[0].measurementsMd) {
-        std::string_view station(reinterpret_cast<const char *>(&st16), 16);
         if (!first) std::cout << ", ";
         first = false;
         double mean = (agg.sum / 10.0) / agg.count;
