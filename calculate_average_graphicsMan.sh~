@@ -15,7 +15,5 @@
 #  limitations under the License.
 #
 
-JAVA21='/Users/bbudge/homebrew/opt/openjdk@21/bin/java'
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-$JAVA21 --class-path "$SCRIPT_DIR/target/average-1.0.0-SNAPSHOT.jar" dev.morling.onebrc.CreateMeasurements $1
+JAVA_OPTS=""
+java $JAVA_OPTS --class-path target/average-1.0.0-SNAPSHOT.jar dev.morling.onebrc.CalculateAverage_graphicsMan

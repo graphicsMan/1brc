@@ -1,0 +1,120 @@
+Analysis of sampling calculate_average (pid 74566) every 1 millisecond
+Process:         calculate_average [74566]
+Path:            /private/tmp/calculate_average
+Load Address:    0x104c9c000
+Identifier:      calculate_average
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  zsh [7404]
+Target Type:     live task
+
+Date/Time:       2026-01-04 11:03:42.952 -0800
+Launch Time:     2026-01-04 11:03:39.866 -0800
+OS Version:      macOS 26.1 (25B78)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         765.6M
+Physical footprint (peak):  765.6M
+Idle exit:                  untracked
+----
+
+Call graph:
+    4282 Thread_42601050   DispatchQueue_1: com.apple.main-thread  (serial)
+      4282 start  (in dyld) + 7184  [0x185f79d54]
+        1423 main  (in calculate_average) + 516,528  [0x104c9c73c,0x104c9c748]  CalculateAverage_graphicsMan.cpp:155
+        1286 main  (in calculate_average) + 532,548,...  [0x104c9c74c,0x104c9c75c,...]  CalculateAverage_graphicsMan.cpp:158
+        712 main  (in calculate_average) + 712  [0x104c9c800]  CalculateAverage_graphicsMan.cpp:163
+        + 308 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 228  [0x104c9d8ac]  __hash_table:1541
+        + ! 252 _platform_memcmp  (in libsystem_platform.dylib) + 260,280,...  [0x186348fd4,0x186348fe8,...]
+        + ! 56 DYLD-STUB$$memcmp  (in calculate_average) + 4  [0x104c9e110]
+        + 138 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 60  [0x104c9d804]  __hash_table:1529
+        + ! 75 std::__murmur2_or_cityhash<unsigned long, 64ul>::operator()[abi:ne200100](void const*, unsigned long) const  (in calculate_average) + 936,992,...  [0x104c9dee8,0x104c9df20,...]  hash.h:89
+        + ! 35 std::__murmur2_or_cityhash<unsigned long, 64ul>::operator()[abi:ne200100](void const*, unsigned long) const  (in calculate_average) + 8  [0x104c9db48]  hash.h:88
+        + ! 14 std::__murmur2_or_cityhash<unsigned long, 64ul>::operator()[abi:ne200100](void const*, unsigned long) const  (in calculate_average) + 1008,464  [0x104c9df30,0x104c9dd10]  hash.h:123
+        + ! 11 std::__murmur2_or_cityhash<unsigned long, 64ul>::operator()[abi:ne200100](void const*, unsigned long) const  (in calculate_average) + 0,4  [0x104c9db40,0x104c9db44]  hash.h:87
+        + ! 3 std::__murmur2_or_cityhash<unsigned long, 64ul>::operator()[abi:ne200100](void const*, unsigned long) const  (in calculate_average) + 296,996  [0x104c9dc68,0x104c9df24]  hash.h:0
+        + 77 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 48  [0x104c9d7f8]  __hash_table:1529
+        + 47 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 228,200,...  [0x104c9d8ac,0x104c9d890,...]  __hash_table:1541
+        + 42 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 84,112,...  [0x104c9d81c,0x104c9d838,...]  __hash_table:1535
+        + 33 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 136  [0x104c9d850]  __hash_table:1536
+        + 29 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 152,144  [0x104c9d860,0x104c9d858]  __hash_table:0
+        + 28 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 444  [0x104c9d984]  __hash_table:1575
+        + 6 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 64  [0x104c9d808]  __hash_table:1530
+        + 4 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 188,196  [0x104c9d884,0x104c9d88c]  __hash_table:1539
+        359 std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average) + 452,468,...  [0x104c9d98c,0x104c9d99c,...]  __hash_table:1575
+        245 main  (in calculate_average) + 576,440  [0x104c9c778,0x104c9c6f0]  CalculateAverage_graphicsMan.cpp:0
+        183 main  (in calculate_average) + 652,668,...  [0x104c9c7c4,0x104c9c7d4,...]  CalculateAverage_graphicsMan.cpp:162
+        72 main  (in calculate_average) + 696,780,...  [0x104c9c7f0,0x104c9c844,...]  CalculateAverage_graphicsMan.cpp:163
+        1 main  (in calculate_average) + 496  [0x104c9c728]  CalculateAverage_graphicsMan.cpp:150
+        + 1 std::basic_ostream<char>::__put_num_integer_promote[abi:ne200100]<int>(int)  (in libc++.1.dylib) + 368  [0x18627a93c]
+        +   1 std::num_put<char, std::ostreambuf_iterator<char>>::__do_put_integral[abi:ne200100]<long>(std::ostreambuf_iterator<char>, std::ios_base&, char, long, char const*) const  (in libc++.1.dylib) + 188  [0x18628fb5c]
+        +     1 std::__num_put<char>::__widen_and_group_int(char*, char*, char*, char*, char*&, char*&, std::locale const&)  (in libc++.1.dylib) + 860  [0x186291f08]
+        +       1 std::ctype<char>::do_widen(char const*, char const*, char*) const  (in libc++.1.dylib) + 0  [0x1862a1c8c]
+        1 main  (in calculate_average) + 512  [0x104c9c738]  CalculateAverage_graphicsMan.cpp:150
+          1 std::__put_character_sequence[abi:ne200100]<char>(std::basic_ostream<char>&, char const*, unsigned long)  (in calculate_average) + 200  [0x104c9d408]  put_character_sequence.h:37
+            1 std::__pad_and_output[abi:ne200100]<char>(std::ostreambuf_iterator<char>, char const*, char const*, char const*, std::ios_base&, char)  (in calculate_average) + 328  [0x104c9d5f4]  pad_and_output.h:75
+              1 fwrite  (in libsystem_c.dylib) + 316  [0x1861edf90]
+                1 __sfvwrite  (in libsystem_c.dylib) + 836  [0x1861d1e14]
+                  1 __sflush  (in libsystem_c.dylib) + 232  [0x1861dd3e4]
+                    1 _swrite  (in libsystem_c.dylib) + 108  [0x1861df35c]
+                      1 __swrite  (in libsystem_c.dylib) + 24  [0x1861fe884]
+                        1 __write_nocancel  (in libsystem_kernel.dylib) + 8  [0x186302bd0]
+
+Total number in stack (recursive counted multiple, when >=5):
+
+Sort by top of stack, same collapsed (when >= 5):
+        main  (in calculate_average)        3209
+        std::__hash_table<std::__hash_value_type<std::basic_string_view<char>, MeasurementAggregator>>::__emplace_unique_key_args<std::basic_string_view<char>, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>, std::tuple<>>(std::basic_string_view<char> const&, std::piecewise_construct_t const&, std::tuple<std::basic_string_view<char> const&>&&, std::tuple<>&&)  (in calculate_average)        625
+        _platform_memcmp  (in libsystem_platform.dylib)        252
+        std::__murmur2_or_cityhash<unsigned long, 64ul>::operator()[abi:ne200100](void const*, unsigned long) const  (in calculate_average)        138
+        DYLD-STUB$$memcmp  (in calculate_average)        56
+
+Binary Images:
+       0x104c9c000 -        0x104c9e3f7 +calculate_average (0) <4129F7E5-C232-3272-A46E-2F1C158CEC31> /tmp/calculate_average
+       0x185eec000 -        0x185f3f48b  libobjc.A.dylib (951.1) <5A0AAB4E-0C1A-3680-82C9-43DC4007A6E7> /usr/lib/libobjc.A.dylib
+       0x185f40000 -        0x185f70bcb  libdyld.dylib (1330) <A64128D9-375B-36AE-8FEB-69D80F987D3C> /usr/lib/system/libdyld.dylib
+       0x185f71000 -        0x18600ff63  dyld (1.0.0 - 1330) <B50F5A1A-BE81-3068-92E1-3554F2BE478A> /usr/lib/dyld
+       0x186010000 -        0x1860131d0  libsystem_blocks.dylib (96) <F17000B3-F871-3590-B604-7C4A13EAE01C> /usr/lib/system/libsystem_blocks.dylib
+       0x186014000 -        0x186068f7f  libxpc.dylib (3089.41.2) <8346BE50-DE08-3606-9FB6-9A352975661D> /usr/lib/system/libxpc.dylib
+       0x186069000 -        0x18608981f  libsystem_trace.dylib (1815.40.20) <4D6C380B-736B-312F-B8E3-47E6C10DF033> /usr/lib/system/libsystem_trace.dylib
+       0x18608a000 -        0x18613654f  libcorecrypto.dylib (1922.40.14) <9E80591D-F3C9-3DAA-95BB-10BB4C313A84> /usr/lib/system/libcorecrypto.dylib
+       0x186137000 -        0x186182bef  libsystem_malloc.dylib (792.41.1) <8A4825B5-E480-3A53-B35B-B90DCB34EE46> /usr/lib/system/libsystem_malloc.dylib
+       0x186183000 -        0x1861c9e9f  libdispatch.dylib (1542.0.4) <8FB392AE-401F-399A-96AE-41531CF91162> /usr/lib/system/libdispatch.dylib
+       0x1861ca000 -        0x1861ccfeb  libsystem_featureflags.dylib (101) <37F5A64F-CD19-3146-AA3D-7EED47C7B4DE> /usr/lib/system/libsystem_featureflags.dylib
+       0x1861cd000 -        0x18624f047  libsystem_c.dylib (1725.40.4) <9F5BD98B-9367-3594-933B-16F392C2A5F8> /usr/lib/system/libsystem_c.dylib
+       0x186250000 -        0x1862e2e53  libc++.1.dylib (2000.63) <B29F2164-26B0-3016-A871-82DE5A4637FF> /usr/lib/libc++.1.dylib
+       0x1862e3000 -        0x1862fd92f  libc++abi.dylib (2000.63) <94052F7C-7016-32FF-9FEF-EEFAE55A2ADB> /usr/lib/libc++abi.dylib
+       0x1862fe000 -        0x18633a49f  libsystem_kernel.dylib (12377.41.6) <9FE7C84D-0C2B-363F-BEE5-6FD76D67A227> /usr/lib/system/libsystem_kernel.dylib
+       0x18633b000 -        0x186347abb  libsystem_pthread.dylib (539) <E95973B8-824C-361E-ADF4-390747C40897> /usr/lib/system/libsystem_pthread.dylib
+       0x186348000 -        0x1863503bf  libsystem_platform.dylib (359.40.3) <530FC11D-A495-375D-B2B9-81AE3E701781> /usr/lib/system/libsystem_platform.dylib
+       0x186351000 -        0x186380e23  libsystem_info.dylib (600) <62637EA2-0B6F-3695-9009-7E08AD4FC2F3> /usr/lib/system/libsystem_info.dylib
+       0x18a2eb000 -        0x18a2f5397  libsystem_darwin.dylib (1725.40.4) <786F353E-9012-3409-A7DF-08FB7E8C21CC> /usr/lib/system/libsystem_darwin.dylib
+       0x18a75c000 -        0x18a76dff3  libsystem_notify.dylib (344.0.1) <24C492E0-C65F-3432-9337-90ED0C1EB2CD> /usr/lib/system/libsystem_notify.dylib
+       0x18ca33000 -        0x18ca4dfdb  libsystem_networkextension.dylib (2205.41.2) <6110390E-A0DB-38B4-AF8E-D6DC1F92C355> /usr/lib/system/libsystem_networkextension.dylib
+       0x18cad1000 -        0x18cae8ff3  libsystem_asl.dylib (404) <4B1F55B9-88E1-3B61-8A2B-B9D471D1E964> /usr/lib/system/libsystem_asl.dylib
+       0x18e677000 -        0x18e67f3a7  libsystem_symptoms.dylib (2158.40.9) <7F3D95B2-C8F6-3604-A6A4-54C8056FA9B7> /usr/lib/system/libsystem_symptoms.dylib
+       0x1925df000 -        0x1926172bb  libsystem_containermanager.dylib (725.40.12) <4AA81635-2296-3F01-93AE-0089169C0344> /usr/lib/system/libsystem_containermanager.dylib
+       0x193a29000 -        0x193a2d66f  libsystem_configuration.dylib (1385.40.9) <ED3639AF-44FD-37EE-8B7F-1A840E23D5AD> /usr/lib/system/libsystem_configuration.dylib
+       0x193a2e000 -        0x193a346a7  libsystem_sandbox.dylib (2680.41.1) <D3C3FE0A-BFEE-34D2-B3F6-3C7B6A4407CE> /usr/lib/system/libsystem_sandbox.dylib
+       0x194fa8000 -        0x194fab1fb  libquarantine.dylib (196.40.3) <76BD9E76-E9B4-3D8F-9675-51A86391C86F> /usr/lib/system/libquarantine.dylib
+       0x19572b000 -        0x195731f4f  libsystem_coreservices.dylib (191.1.2.200) <1617C3D3-68FD-3970-BCFF-A623344E510E> /usr/lib/system/libsystem_coreservices.dylib
+       0x195c6c000 -        0x195ca98b7  libsystem_m.dylib (3309) <219BCAAB-9FBB-3DAD-8B02-EF30D40BF21A> /usr/lib/system/libsystem_m.dylib
+       0x195cab000 -        0x195cae537  libmacho.dylib (1030.6.3) <02B180AE-8EB8-3D0A-A088-8B7751BD6B5D> /usr/lib/system/libmacho.dylib
+       0x195cc8000 -        0x195cd562f  libcommonCrypto.dylib (600035) <1C618B53-3317-3D31-A19D-94E2142BC0BA> /usr/lib/system/libcommonCrypto.dylib
+       0x195cd6000 -        0x195cdfb0b  libunwind.dylib (1900.125) <4A2DAFEF-0FC7-3CBD-9A8D-A6D2ED8EF115> /usr/lib/system/libunwind.dylib
+       0x195ce8000 -        0x195cf26ff  libcopyfile.dylib (230.0.1.0.1) <6490C0C2-9700-3F37-A413-58B5E1FF285E> /usr/lib/system/libcopyfile.dylib
+       0x195cf3000 -        0x195cf695f  libcompiler_rt.dylib (103.3) <3BA72D71-990F-3911-87B3-50F0EA714198> /usr/lib/system/libcompiler_rt.dylib
+       0x195cf7000 -        0x195cfba1b  libsystem_collections.dylib (1725.40.4) <669A1A2D-8694-3E02-B154-D970AFC2CE31> /usr/lib/system/libsystem_collections.dylib
+       0x195cfc000 -        0x195cff4bf  libsystem_secinit.dylib (168.40.2) <EB462CEE-C06C-3E1D-8817-ACC597C4C995> /usr/lib/system/libsystem_secinit.dylib
+       0x195d00000 -        0x195d02b57  libremovefile.dylib (84) <6F90FCF4-6046-33C5-A583-19620A6E226E> /usr/lib/system/libremovefile.dylib
+       0x195d03000 -        0x195d03f27  libkeymgr.dylib (31) <413ACA7C-28E4-3BF2-8535-2A3F3F9BCBAC> /usr/lib/system/libkeymgr.dylib
+       0x195d04000 -        0x195d0cf87  libsystem_dnssd.dylib (2881.40.18) <C034FE5E-54C1-3D7C-BF3F-86F87908763F> /usr/lib/system/libsystem_dnssd.dylib
+       0x195d0d000 -        0x195d120b3  libcache.dylib (95) <5A47A904-437B-3455-8117-E7C5D72F08F2> /usr/lib/system/libcache.dylib
+       0x195d13000 -        0x195d14cf3  libSystem.B.dylib (1356) <AE3A4D1A-7CE2-360E-920A-4B1223336609> /usr/lib/libSystem.B.dylib
+       0x27f3a7000 -        0x27f3ae319  libRosetta.dylib (365.3) <033B4378-3705-3580-8FB1-8DB5688DE702> /usr/lib/libRosetta.dylib
+       0x280acc000 -        0x280acfdeb  libsystem_darwindirectory.dylib (122) <9B373C44-0144-3CCD-86B5-D6EBD4E7D7E8> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x280ad0000 -        0x280ad739b  libsystem_eligibility.dylib (286.40.9.0.1) <9008D680-86FF-3811-923A-77087AE9FC8B> /usr/lib/system/libsystem_eligibility.dylib
+       0x280ad8000 -        0x280adf873  libsystem_sanitizers.dylib (25) <EEA7F32D-849B-315B-8017-2F3313F13E32> /usr/lib/system/libsystem_sanitizers.dylib
+       0x280ae0000 -        0x280ae0bb7  libsystem_trial.dylib (474.3) <40FCA195-78F6-3415-957E-23BAC002B9C8> /usr/lib/system/libsystem_trial.dylib

@@ -26,6 +26,7 @@
 #include <cmath>
 #include <stdint.h>
 #include <tuple>
+#include <thread>
 
 #include <vector>
 
@@ -107,6 +108,13 @@ struct MeasurementAggregator {
       max = std::max<int16_t>(max, value);
       sum += value;
       ++count;
+    }
+
+    void merge(const MeasurementAggregator& other) {
+      min = std::min<int16_t>(min, other.min);
+      max = std::max<int16_t>(max, other.max);
+      sum += other.sum;
+      count += other.count;
     }
 };
 
@@ -540,25 +548,14 @@ struct DumbMap {
   }
 };
 
-int main() {
-    MMap mmap;
-    if (!mmap.open(kFile)) {
-        std::cerr << "Failed to open file: " << kFile << std::endl;
-        return 1;
-    }
-
+struct Maps {
     struct sLghash {
       size_t operator() (std::string_view v) const {
         uint64_t h = 0;
         memcpy(&h, v.data(), std::min<uint64_t>(8, v.size()));
-               
         return h * uint64_t{0x9e3779b97f4a7c15};
       }
     };
-    
-    std::unordered_map<std::string_view, MeasurementAggregator, sLghash> measurementsLg;
-    measurementsLg.reserve(256);
-    //std::flat_map<std::string_view, MeasurementAggregator> measurementsLg;
 
     struct s16hash {
       size_t operator() (suint128 v) const {
@@ -566,44 +563,23 @@ int main() {
       }
     };
 
-    std::unordered_map<suint128, MeasurementAggregator, s16hash> measurementsMd;
-    measurementsMd.reserve(4096);
-    //std::flat_map<suint128, MeasurementAggregator> measurementsMd;
-   
     struct s8hash {
       size_t operator() (uint64_t v) const {
-        return v;// * uint64_t{0x9e3779b97f4a7c15};
+        return v;
       }
     };
-    
+
+    std::unordered_map<std::string_view, MeasurementAggregator, sLghash> measurementsLg;
+    std::unordered_map<suint128, MeasurementAggregator, s16hash> measurementsMd;
     std::unordered_map<uint64_t, MeasurementAggregator, s8hash> measurementsSm;
-    measurementsSm.reserve(4096);
 
-    DumbMap measurementsDumb;
+    Maps() {
+        measurementsLg.reserve(256);
+        measurementsMd.reserve(4096);
+        measurementsSm.reserve(4096);
+    }
 
-    char* p = mmap.data;
-    char* end = mmap.data + mmap.size / 2;
-
-    // Process all complete lines except the last few to ensure parseNext has buffer space
-    // We'll process the tail separately
-    char* safeEnd = end - 32; // Conservative: ensure enough space for parseNext reads
-    if (safeEnd < p) safeEnd = p;
-
-    int cnt = 0;
-
-
-    Trie measurementsTable[256];
-
-    std::vector<std::pair<std::string_view, MeasurementAggregator>> measurements;
-
-    while (p < safeEnd) {
-        if ((cnt & 0xffffff) == 0) {
-            std::cout << "cnt=" << cnt << "\n";
-        }
-        ++cnt;
-
-        auto [station, value, lineEnd] = parseNext(p);
-
+    void add(std::string_view station, int value) {
         if (station.size() < 8) {
             uint64_t st8 = 0;
             std::memcpy(&st8, station.data(), station.size());
@@ -617,7 +593,54 @@ int main() {
         else {
             measurementsLg[station].add(value);
         }
+    }
 
+    void merge(const Maps& other) {
+        // Merge large maps
+        for (const auto& [station, agg] : other.measurementsLg) {
+            measurementsLg[station].merge(agg);
+        }
+        // Merge medium maps
+        for (const auto& [st16, agg] : other.measurementsMd) {
+            measurementsMd[st16].merge(agg);
+        }
+        // Merge small maps
+        for (const auto& [st8, agg] : other.measurementsSm) {
+            measurementsSm[st8].merge(agg);
+        }
+    }
+};
+
+void processChunk(char* roughStart, char* roughEnd, char* fileStart, char* fileEnd, Maps& maps) {
+    char* start = roughStart;
+    char* end = roughEnd;
+
+    // If not the first chunk, skip to the first complete line
+    if (start > fileStart) {
+        while (start < fileEnd && *(start - 1) != '\n') {
+            ++start;
+        }
+    }
+
+    // If not the last chunk, find the end of the last complete line in our range
+    if (end < fileEnd) {
+        while (end < fileEnd && *end != '\n') {
+            ++end;
+        }
+        if (end < fileEnd) {
+            ++end; // Move past the newline
+        }
+    }
+
+    char* p = start;
+
+    // Process all complete lines except the last few to ensure parseNext has buffer space
+    char* safeEnd = end - 32; // Conservative: ensure enough space for parseNext reads
+    if (safeEnd < p) safeEnd = p;
+
+    while (p < safeEnd) {
+        auto [station, value, lineEnd] = parseNext(p);
+        maps.add(station, value);
         p = lineEnd + 1;
     }
 
@@ -655,80 +678,92 @@ int main() {
         char* lineEnd = temp;
         while (lineEnd < end && *lineEnd != '\n') ++lineEnd;
 
-        if (station.size() < 8) {
-            uint64_t st8 = 0;
-            std::memcpy(&st8, station.data(), station.size());
-            measurementsSm[st8].add(value);
-        } else if (station.size() < 16) {
-            suint128 st16;
-            st16.set(station);
-            measurementsMd[st16].add(value);
-        } else {
-            measurementsLg[station].add(value);
-        }
-
+        maps.add(station, value);
         p = lineEnd + 1;
     }
+}
 
-    std::cout << "small: " << measurementsSm.size() << std::endl;
-    std::cout << "medium: " << measurementsMd.size() << std::endl;
-    std::cout << "large: " << measurementsLg.size() << std::endl;
+int main() {
+    MMap mmap;
+    if (!mmap.open(kFile)) {
+        std::cerr << "Failed to open file: " << kFile << std::endl;
+        return 1;
+    }
 
+    // Get number of threads
+    unsigned int numThreads = std::thread::hardware_concurrency();
+    if (numThreads == 0) numThreads = 1; // Fallback if not detected
 
-    // for (auto &outer : measurementsDumb.vec) {
-    //   for (auto &inner : outer) {
-    //     measurementsSm.insert(inner);
-    //   }
-    // }
-    
-    // for (int i = 0; i < 256; ++i) {
-    //   for (int j = 0; j < 256; ++j) {
+    std::cout << "Using " << numThreads << " threads" << std::endl;
 
-    //     if (!measurementsTable[i][j].empty()) {
-    //       std::print("======================================\n");
-    //       for (const auto& [station, index, count] : measurementsTable[i][j]) {
-    //         std::print("{} : {}, {}\n", station, index, count);
+    // Create Maps for each thread
+    std::vector<Maps> threadMaps(numThreads);
 
-    //     }
-    //   }
-    // }
-    // }
+    // Divide work into rough chunks - each thread will find its own exact boundaries
+    size_t chunkSize = mmap.size / numThreads;
 
+    char* fileStart = mmap.data;
+    char* fileEnd = mmap.data + mmap.size;
+
+    // Launch threads (N-1 worker threads, main thread will be one worker)
+    std::vector<std::thread> threads;
+
+    for (unsigned int i = 1; i < numThreads; ++i) {
+        char* roughStart = mmap.data + (i * chunkSize);
+        char* roughEnd = (i == numThreads - 1) ? fileEnd : (mmap.data + ((i + 1) * chunkSize));
+
+        threads.emplace_back([roughStart, roughEnd, fileStart, fileEnd, &threadMaps, i]() {
+            processChunk(roughStart, roughEnd, fileStart, fileEnd, threadMaps[i]);
+        });
+    }
+
+    // Main thread processes first chunk
+    char* roughStart = fileStart;
+    char* roughEnd = mmap.data + chunkSize;
+    processChunk(roughStart, roughEnd, fileStart, fileEnd, threadMaps[0]);
+
+    // Wait for all threads to complete
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    std::cout << "All threads completed, merging results..." << std::endl;
+
+    // Merge all Maps into the first one
+    for (unsigned int i = 1; i < numThreads; ++i) {
+        threadMaps[0].merge(threadMaps[i]);
+    }
+
+    std::cout << "small: " << threadMaps[0].measurementsSm.size() << std::endl;
+    std::cout << "medium: " << threadMaps[0].measurementsMd.size() << std::endl;
+    std::cout << "large: " << threadMaps[0].measurementsLg.size() << std::endl;
+
+    // Output results
     std::cout << "{";
     bool first = true;
-    for (const auto& [station, agg] : measurementsLg) {
+    for (const auto& [station, agg] : threadMaps[0].measurementsLg) {
         if (!first) std::cout << ", ";
         first = false;
         double mean = (agg.sum / 10.0) / agg.count;
         ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
         std::cout << station << "=" << result.toString();
     }
-    for (const auto& [st8, agg] : measurementsSm) {
-      std::string_view station(reinterpret_cast<const char *>(&st8));
+    for (const auto& [st8, agg] : threadMaps[0].measurementsSm) {
+        std::string_view station(reinterpret_cast<const char *>(&st8));
         if (!first) std::cout << ", ";
         first = false;
         double mean = (agg.sum / 10.0) / agg.count;
         ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
         std::cout << station << "=" << result.toString();
     }
-
-      for (const auto& [station, agg] : measurements) {
+    for (const auto& [st16, agg] : threadMaps[0].measurementsMd) {
+        std::string_view station(reinterpret_cast<const char *>(&st16), 16);
         if (!first) std::cout << ", ";
         first = false;
         double mean = (agg.sum / 10.0) / agg.count;
         ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
         std::cout << station << "=" << result.toString();
     }
-    
-    // for (const auto& [st16, agg] : measurementsMd) {
-    //   std::string_view station(reinterpret_cast<const char *>(&st16));
-    //     if (!first) std::cout << ", ";
-    //     first = false;
-    //     double mean = ResultRow::round(agg.sum * 10.0) / 10.0 / agg.count;
-    //     ResultRow result(agg.min, mean, agg.max);
-    //     std::cout << station << "=" << result.toString();
-    // }
-    
     std::cout << "}" << std::endl;
 
     return 0;
