@@ -103,8 +103,8 @@ struct MeasurementAggregator {
   int16_t max = std::numeric_limits<int16_t>::min();
 
     void add(int value) {
-      min = std::min<uint16_t>(min, value);
-      max = std::max<uint16_t>(max, value);
+      min = std::min<int16_t>(min, value);
+      max = std::max<int16_t>(max, value);
       sum += value;
       ++count;
     }
@@ -242,70 +242,222 @@ bool operator <(suint128 l, suint128 r)  {
         return (l.a < r.a) || ((l.a == r.a) & (l.b < r.b));
       }
 
+// SWAR constants for finding specific bytes
+constexpr uint64_t kSemicolonPattern = 0x3B3B3B3B3B3B3B3BULL;  // ';' repeated 8 times
+constexpr uint64_t kNewlinePattern = 0x0A0A0A0A0A0A0A0AULL;    // '\n' repeated 8 times
+constexpr uint64_t kSwarLow = 0x0101010101010101ULL;           // For zero-byte detection
+constexpr uint64_t kSwarHigh = 0x8080808080808080ULL;          // For zero-byte detection
+
 #ifdef __AVX2__
 __attribute__((noinline)) std::tuple<std::string_view, int, char*> parseNext(char *p) {
-    // Find semicolon - optimized to skip first character (guaranteed min 1 char)
-    char* semi = p + 1;
+    // Load 32 bytes to capture station + temperature in most cases
+    __m256i chunk = _mm256_loadu_si256((__m256i*)p);
 
-    // AVX2 version - search 32 bytes at a time
+    // Find semicolon
     __m256i vsemi = _mm256_set1_epi8(';');
+    __m256i cmp_semi = _mm256_cmpeq_epi8(chunk, vsemi);
+    int mask_semi = _mm256_movemask_epi8(cmp_semi);
 
-    while (true) {
-        __m256i chunk = _mm256_loadu_si256((__m256i*)semi);
-        __m256i cmp = _mm256_cmpeq_epi8(chunk, vsemi);
-        int mask = _mm256_movemask_epi8(cmp);
+    // Find newline
+    __m256i vnewline = _mm256_set1_epi8('\n');
+    __m256i cmp_newline = _mm256_cmpeq_epi8(chunk, vnewline);
+    int mask_newline = _mm256_movemask_epi8(cmp_newline);
 
-        if (mask) {
-            semi += __builtin_ctz(mask);
-            break;
-        }
-        semi += 32;
+    int semi_pos, newline_pos;
+
+    if (mask_semi && mask_newline) {
+        // Fast path: both in first 32 bytes (~99% of cases)
+        semi_pos = __builtin_ctz(mask_semi);
+        newline_pos = __builtin_ctz(mask_newline);
+    } else {
+        // Fallback: search for semicolon/newline sequentially
+        char* semi = p + 1;
+        while (*semi != ';') ++semi;
+        semi_pos = semi - p;
+
+        char* lineEnd = semi + 1;
+        while (*lineEnd != '\n') ++lineEnd;
+        newline_pos = lineEnd - p;
     }
 
-    std::string_view station(p, semi - p);
+    std::string_view station(p, semi_pos);
 
-    // Parse temperature with fast paths for common formats
-    char* temp = semi + 1;
+    // Parse temperature from the loaded chunk
+    char* temp = p + semi_pos + 1;
+    int temp_len = newline_pos - semi_pos - 1;
 
-    // Load 8 bytes containing temperature
+    // Extract temperature bytes from chunk
     uint64_t temp_data;
     memcpy(&temp_data, temp, 8);
 
     int sign = 1;
-    int offset = 0;
     if ((temp_data & 0xFF) == '-') {
         sign = -1;
-        offset = 1;
         temp_data >>= 8;
+        temp_len--;
     }
 
-    // Extract bytes
-    int b0 = (temp_data & 0xFF);
+    int value;
+    int b0 = (temp_data & 0xFF) - '0';
     int b1 = (temp_data >> 8) & 0xFF;
     int b2 = (temp_data >> 16) & 0xFF;
     int b3 = (temp_data >> 24) & 0xFF;
 
-    int value;
-    char* lineEnd;
-
-    // Fast path: d.d format (most common)
-    if (b1 == '.') {
-        value = ((b0 - '0') * 10 + (b2 - '0'));
-        lineEnd = temp + offset + 3;
-    }
-    // Fast path: dd.d format (second most common)
-    else if (b2 == '.') {
-        value = ((b0 - '0') * 100 + (b1 - '0') * 10 + (b3 - '0'));
-        lineEnd = temp + offset + 4;
-    }
-    // Rare: ddd.d format
-    else {
+    // Use temp_len to determine format (branchless where possible)
+    if (temp_len == 3) {
+        // d.d
+        value = b0 * 10 + ((b2 - '0'));
+    } else if (temp_len == 4) {
+        // dd.d
+        value = b0 * 100 + ((b1 - '0') * 10) + ((b3 - '0'));
+    } else {
+        // ddd.d
         int b4 = (temp_data >> 32) & 0xFF;
-        value = ((b0 - '0') * 1000 + (b1 - '0') * 100 + (b2 - '0') * 10 + (b4 - '0'));
-        lineEnd = temp + offset + 5;
+        value = b0 * 1000 + ((b1 - '0') * 100) + ((b2 - '0') * 10) + ((b4 - '0'));
     }
 
-    return {station, sign * value, lineEnd};
+    return {station, sign * value, p + newline_pos};
+}
+#elif defined(__ARM_NEON)
+inline std::tuple<std::string_view, int, char*> parseNext(char *p) {
+    // Lambda to find character position using SWAR on 16-byte NEON register
+    auto findChar = [](uint8x16_t chunk, uint64_t target_pattern) -> int {
+        uint64_t chunk_lo = vgetq_lane_u64(vreinterpretq_u64_u8(chunk), 0);
+        uint64_t chunk_hi = vgetq_lane_u64(vreinterpretq_u64_u8(chunk), 1);
+
+        uint64_t xor_lo = chunk_lo ^ target_pattern;
+        uint64_t has_lo = (xor_lo - kSwarLow) & ~xor_lo & kSwarHigh;
+
+        if (has_lo) {
+            return __builtin_ctzll(has_lo) >> 3;
+        }
+
+        uint64_t xor_hi = chunk_hi ^ target_pattern;
+        uint64_t has_hi = (xor_hi - kSwarLow) & ~xor_hi & kSwarHigh;
+        return 8 + (__builtin_ctzll(has_hi) >> 3);
+    };
+
+    // Load 16 bytes first (covers 60% of cases)
+    uint8x16_t chunk = vld1q_u8((uint8_t*)p);
+
+    // Find semicolon and newline
+    uint8x16_t vsemi = vdupq_n_u8(';');
+    uint8x16_t vnewline = vdupq_n_u8('\n');
+    uint8x16_t cmp_semi = vceqq_u8(chunk, vsemi);
+    uint8x16_t cmp_newline = vceqq_u8(chunk, vnewline);
+
+    int semi_pos = -1;
+    int newline_pos = -1;
+
+    // Check if both semicolon and newline are in first 16 bytes
+    if (vmaxvq_u8(cmp_semi) && vmaxvq_u8(cmp_newline)) {
+        // Fast path: both found in 16 bytes
+        semi_pos = findChar(chunk, kSemicolonPattern);
+
+        // Find newline, masking out positions before semicolon
+        uint64_t chunk_lo = vgetq_lane_u64(vreinterpretq_u64_u8(chunk), 0);
+        uint64_t chunk_hi = vgetq_lane_u64(vreinterpretq_u64_u8(chunk), 1);
+
+        uint64_t xor_newline_lo = chunk_lo ^ kNewlinePattern;
+        uint64_t has_newline_lo = (xor_newline_lo - kSwarLow) & ~xor_newline_lo & kSwarHigh;
+
+        if (semi_pos < 8) {
+            uint64_t mask = (1ULL << (semi_pos * 8 + 8)) - 1;
+            has_newline_lo &= ~mask;
+        }
+
+        if (has_newline_lo) {
+            newline_pos = __builtin_ctzll(has_newline_lo) >> 3;
+        } else {
+            uint64_t xor_newline_hi = chunk_hi ^ kNewlinePattern;
+            uint64_t has_newline_hi = (xor_newline_hi - kSwarLow) & ~xor_newline_hi & kSwarHigh;
+            newline_pos = 8 + (__builtin_ctzll(has_newline_hi) >> 3);
+        }
+    } else if (vmaxvq_u8(cmp_semi)) {
+        // Semicolon in first 16, newline beyond
+        semi_pos = findChar(chunk, kSemicolonPattern);
+
+        // Load next 16 bytes for newline
+        uint8x16_t chunk2 = vld1q_u8((uint8_t*)(p + 16));
+        uint8x16_t cmp_newline2 = vceqq_u8(chunk2, vnewline);
+
+        if (vmaxvq_u8(cmp_newline2)) {
+            newline_pos = 16 + findChar(chunk2, kNewlinePattern);
+        } else {
+            // Fallback: sequential search for newline beyond 32 bytes
+            char* lineEnd = p + 32;
+            while (*lineEnd != '\n') ++lineEnd;
+            newline_pos = lineEnd - p;
+        }
+    } else {
+        // Fallback: sequential search for both
+        char* semi = p + 1;
+        while (*semi != ';') ++semi;
+        semi_pos = semi - p;
+
+        char* lineEnd = semi + 1;
+        while (*lineEnd != '\n') ++lineEnd;
+        newline_pos = lineEnd - p;
+    }
+
+    std::string_view station(p, semi_pos);
+
+    // Parse temperature using known positions
+    char* temp = p + semi_pos + 1;
+    int temp_len = newline_pos - semi_pos - 1;
+
+    // Extract temperature - try to use already-loaded data when possible
+    uint64_t temp_data;
+    int temp_offset = semi_pos + 1;
+
+    if (vmaxvq_u8(cmp_semi) && vmaxvq_u8(cmp_newline)) {
+        // Both delimiters in first 16 bytes - all data is loaded
+        uint64_t chunk_lo = vgetq_lane_u64(vreinterpretq_u64_u8(chunk), 0);
+        uint64_t chunk_hi = vgetq_lane_u64(vreinterpretq_u64_u8(chunk), 1);
+
+        if (temp_offset < 8) {
+            // Temperature starts in low 8 bytes
+            temp_data = chunk_lo >> (temp_offset * 8);
+            // If we need data from high bytes, combine them
+            if (temp_offset > 0) {
+                temp_data |= (chunk_hi << ((8 - temp_offset) * 8));
+            }
+        } else {
+            // Temperature starts in high 8 bytes
+            temp_data = chunk_hi >> ((temp_offset - 8) * 8);
+        }
+    } else {
+        // Fallback: use memcpy for temperatures beyond first chunk
+        memcpy(&temp_data, temp, 8);
+    }
+
+    int sign = 1;
+    if ((temp_data & 0xFF) == '-') {
+        sign = -1;
+        temp_data >>= 8;
+        temp_len--;
+    }
+
+    int value;
+    int b0 = (temp_data & 0xFF) - '0';
+    int b1 = (temp_data >> 8) & 0xFF;
+    int b2 = (temp_data >> 16) & 0xFF;
+    int b3 = (temp_data >> 24) & 0xFF;
+
+    // Determine format based on temp_len
+    if (temp_len == 3) {
+        // d.d
+        value = b0 * 10 + ((b2 - '0'));
+    } else if (temp_len == 4) {
+        // dd.d
+        value = b0 * 100 + ((b1 - '0') * 10) + ((b3 - '0'));
+    } else {
+        // ddd.d (temp_len == 5)
+        int b4 = (temp_data >> 32) & 0xFF;
+        value = b0 * 1000 + ((b1 - '0') * 100) + ((b2 - '0') * 10) + ((b4 - '0'));
+    }
+
+    return {station, sign * value, p + newline_pos};
 }
 #else
 __attribute__((noinline)) std::tuple<std::string_view, int, char*> parseNext(char *p) {
@@ -316,11 +468,11 @@ __attribute__((noinline)) std::tuple<std::string_view, int, char*> parseNext(cha
     while (true) {
         uint64_t chunk;
         memcpy(&chunk, semi, 8);
-        uint64_t xor_result = chunk ^ 0x3B3B3B3B3B3B3B3BULL; // ';' = 0x3B
-        uint64_t has_semi = (xor_result - 0x0101010101010101ULL) & ~xor_result & 0x8080808080808080ULL;
+        uint64_t xor_result = chunk ^ kSemicolonPattern;
+        uint64_t has_semi = (xor_result - kSwarLow) & ~xor_result & kSwarHigh;
 
         if (has_semi) {
-            semi += __builtin_ctzll(has_semi) / 8;
+            semi += __builtin_ctzll(has_semi) >> 3;
             break;
         }
         semi += 8;
@@ -336,10 +488,8 @@ __attribute__((noinline)) std::tuple<std::string_view, int, char*> parseNext(cha
     memcpy(&temp_data, temp, 8);
 
     int sign = 1;
-    int offset = 0;
     if ((temp_data & 0xFF) == '-') {
         sign = -1;
-        offset = 1;
         temp_data >>= 8;
     }
 
@@ -355,18 +505,18 @@ __attribute__((noinline)) std::tuple<std::string_view, int, char*> parseNext(cha
     // Fast path: d.d format (most common)
     if (b1 == '.') {
         value = ((b0 - '0') * 10 + (b2 - '0'));
-        lineEnd = temp + offset + 3;
+        lineEnd = temp + 3;
     }
     // Fast path: dd.d format (second most common)
     else if (b2 == '.') {
         value = ((b0 - '0') * 100 + (b1 - '0') * 10 + (b3 - '0'));
-        lineEnd = temp + offset + 4;
+        lineEnd = temp + 4;
     }
     // Rare: ddd.d format
     else {
         int b4 = (temp_data >> 32) & 0xFF;
         value = ((b0 - '0') * 1000 + (b1 - '0') * 100 + (b2 - '0') * 10 + (b4 - '0'));
-        lineEnd = temp + offset + 5;
+        lineEnd = temp + 5;
     }
 
     return {station, sign * value, lineEnd};
@@ -549,24 +699,24 @@ int main() {
     for (const auto& [station, agg] : measurementsLg) {
         if (!first) std::cout << ", ";
         first = false;
-        double mean = ResultRow::round(agg.sum * 10.0) / 10.0 / agg.count;
-        ResultRow result(agg.min, mean, agg.max);
+        double mean = (agg.sum / 10.0) / agg.count;
+        ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
         std::cout << station << "=" << result.toString();
     }
     for (const auto& [st8, agg] : measurementsSm) {
       std::string_view station(reinterpret_cast<const char *>(&st8));
         if (!first) std::cout << ", ";
         first = false;
-        double mean = ResultRow::round(agg.sum * 10.0) / 10.0 / agg.count;
-        ResultRow result(agg.min, mean, agg.max);
+        double mean = (agg.sum / 10.0) / agg.count;
+        ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
         std::cout << station << "=" << result.toString();
     }
 
       for (const auto& [station, agg] : measurements) {
         if (!first) std::cout << ", ";
         first = false;
-        double mean = ResultRow::round(agg.sum * 10.0) / 10.0 / agg.count;
-        ResultRow result(agg.min, mean, agg.max);
+        double mean = (agg.sum / 10.0) / agg.count;
+        ResultRow result(agg.min / 10.0, mean, agg.max / 10.0);
         std::cout << station << "=" << result.toString();
     }
     
