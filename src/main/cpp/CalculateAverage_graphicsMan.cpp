@@ -763,10 +763,19 @@ int main() {
 
     std::cout << "Total stations: " << threadMaps[0].measurementsLg.size() << std::endl;
 
+    // Copy to vector and sort by station name
+    std::vector<std::pair<std::string_view, MeasurementAggregator>> sorted;
+    sorted.reserve(threadMaps[0].measurementsLg.size());
+    for (const auto& entry : threadMaps[0].measurementsLg) {
+        sorted.push_back(entry);
+    }
+    std::sort(sorted.begin(), sorted.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
     // Output results (everything is in the large map now)
     std::cout << "{";
     bool first = true;
-    for (const auto& [station, agg] : threadMaps[0].measurementsLg) {
+    for (const auto& [station, agg] : sorted) {
         if (!first) std::cout << ", ";
         first = false;
         double mean = (agg.sum / 10.0) / agg.count;
