@@ -718,7 +718,8 @@ int main() {
     }
 
     // Get number of threads
-    unsigned int numThreads = std::thread::hardware_concurrency();
+    // For memory-constrained machine, use 2x factor to hide page misses
+    unsigned int numThreads = std::thread::hardware_concurrency() * 2;
     if (numThreads == 0) numThreads = 1; // Fallback if not detected
 
     std::cout << "Using " << numThreads << " threads" << std::endl;
